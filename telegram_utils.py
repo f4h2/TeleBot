@@ -1,13 +1,15 @@
 import requests
 import json
 from bs4 import BeautifulSoup
+from utils import write_json
+from db_utils import save_message_to_db_message
 
 TOKEN = "7334701342:AAHnfB9e1AUAEq2bIVmT1WmFVW9s_4325Pg"
 
 def tel_parse_get_message(message):
     print("message-->", message)
 
-    try:  # if the file is an image
+    try:
         g_chat_id = message['message']['chat']['id']
         g_file_id = message['message']['photo'][0]['file_id']
         print("g_chat_id-->", g_chat_id)
@@ -15,7 +17,7 @@ def tel_parse_get_message(message):
 
         return g_file_id
     except:
-        try:  # if the file is a video
+        try:
             g_chat_id = message['message']['chat']['id']
             g_file_id = message['message']['video']['file_id']
             print("g_chat_id-->", g_chat_id)
@@ -23,7 +25,7 @@ def tel_parse_get_message(message):
 
             return g_file_id
         except:
-            try:  # if the file is an audio
+            try:
                 g_chat_id = message['message']['chat']['id']
                 g_file_id = message['message']['audio']['file_id']
                 print("g_chat_id-->", g_chat_id)
@@ -104,7 +106,7 @@ def tel_send_message(chat_id, text):
 
 def tel_send_image(chat_id):
     url = f'https://api.telegram.org/bot{TOKEN}/sendPhoto'
-    t = "https://raw.githubusercontent.com/fbsamples/original-coast-clothing/main/public/styles/male-work.jpg"
+    t = "https://admin.vov.gov.vn/UploadFolder/KhoTin/Images/UploadFolder/VOVVN/Images/sites/default/files/styles/large/public/2024-02/vu%20tru.jpg"
     payload = {
         'chat_id': chat_id,
         'photo': t
@@ -298,3 +300,52 @@ def teleSearchGoogle(chat_id, textSearch):
     r = requests.post(url, json=payload)
     return r, first_image_url
 ###############################
+
+
+def process_message_content(chat_id, message_id, from_id, last_name, txt, msg, current_time):
+    if txt == "hi":
+        tel_send_message(chat_id, "Hello, world!")
+        save_message_to_db_message(message_id, from_id, last_name, txt, "Hello, world!", current_time)
+    elif txt == "image":
+        print("Sending image...")
+        r, t = tel_send_image(chat_id)
+        print(f"Image sent: {t}")
+        save_message_to_db_message(message_id, from_id, last_name, txt, t, current_time)
+    elif txt == "poll":
+        tel_send_poll(chat_id)
+        save_message_to_db_message(message_id, from_id, last_name, txt, "poll", current_time)
+    elif txt == "button":
+        tel_send_button(chat_id)
+        save_message_to_db_message(message_id, from_id, last_name, txt, "button", current_time)
+    elif txt == "audio":
+        r, t = tel_send_audio(chat_id)
+        save_message_to_db_message(message_id, from_id, last_name, txt, t, current_time)
+    elif txt == "file":
+        r, t = tel_send_document(chat_id)
+        save_message_to_db_message(message_id, from_id, last_name, txt, t, current_time)
+    elif txt == "video":
+        r, t = tel_send_video(chat_id)
+        save_message_to_db_message(message_id, from_id, last_name, txt, t, current_time)
+    elif txt == "inline":
+        tel_send_inlinebutton(chat_id)
+        save_message_to_db_message(message_id, from_id, last_name, txt, "inline", current_time)
+    elif txt == "inlineurl":
+        tel_send_inlineurl(chat_id)
+        save_message_to_db_message(message_id, from_id, last_name, txt, "inlineurl", current_time)
+    elif txt == "ic_A":
+        tel_send_message(chat_id, "You have clicked A")
+        save_message_to_db_message(message_id, from_id, last_name, txt, "You have clicked A", current_time)
+    elif txt == "ic_B":
+        tel_send_message(chat_id, "You have clicked B")
+        save_message_to_db_message(message_id, from_id, last_name, txt, "You have clicked B", current_time)
+    elif txt == "read_new":
+        r, str1 = tele_read_news(chat_id)
+        save_message_to_db_message(message_id, from_id, last_name, txt, str1, current_time)
+    else:
+        write_json(msg, 'xxx.json')
+        response, image_url = teleSearchGoogle(chat_id, txt)
+        if response.status_code == 200:
+            tel_send_message(chat_id, 'from webhook')
+        else:
+            image_url = "Failed to get URL"
+        save_message_to_db_message(message_id, from_id, last_name, txt, image_url, current_time)

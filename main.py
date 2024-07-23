@@ -140,7 +140,7 @@ def save_user_to_db(first_name, last_name):
 def tel_parse_get_message(message):
     print("message-->", message)
 
-    try:  # if the file is an image
+    try:
         g_chat_id = message['message']['chat']['id']
         g_file_id = message['message']['photo'][0]['file_id']
         print("g_chat_id-->", g_chat_id)
@@ -148,7 +148,7 @@ def tel_parse_get_message(message):
 
         return g_file_id
     except:
-        try:  # if the file is a video
+        try:
             g_chat_id = message['message']['chat']['id']
             g_file_id = message['message']['video']['file_id']
             print("g_chat_id-->", g_chat_id)
@@ -164,7 +164,7 @@ def tel_parse_get_message(message):
 
                 return g_file_id
             except:
-                try:  # if the file is a document
+                try:
                     g_chat_id = message['message']['chat']['id']
                     g_file_id = message['message']['document']['file_id']
                     print("g_chat_id-->", g_chat_id)
