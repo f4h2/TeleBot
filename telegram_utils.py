@@ -270,8 +270,8 @@ def tele_read_news(chat_id):
     return r,str1
 ############### searchGoogle
 def searchGoogle(textSearch):
-    API_KEY = "AIzaSyBThrlj9oA0Zjmz-LFL3ZTWEv1xcBsKbuE"          # https://console.cloud.google.com/apis/credentials?project=testsearch-429915
-    SEARCH_ENGINE_ID = "705ae1e64eda449fc"                       # https://programmablesearchengine.google.com/controlpanel/overview?cx=705ae1e64eda449fc
+    API_KEY = "AIzaSyAxQ78Jk6iqUD2bCKsleEPWBjy8VXKBaQA"          # https://console.cloud.google.com/apis/credentials?project=testsearch-429915
+    SEARCH_ENGINE_ID = "80854a8a4f95a4634"                     # https://programmablesearchengine.google.com/controlpanel/overview?cx=705ae1e64eda449fc
     search_query = textSearch
     url = 'https://www.googleapis.com/customsearch/v1'
     params = {
@@ -301,8 +301,11 @@ def teleSearchGoogle(chat_id, textSearch):
     return r, first_image_url
 ###############################
 
-
+processed_message_ids = set()
 def process_message_content(chat_id, message_id, from_id, last_name, txt, msg, current_time):
+    if message_id in processed_message_ids:
+        return
+    processed_message_ids.add(message_id)
     if txt == "hi":
         tel_send_message(chat_id, "Hello, world!")
         save_message_to_db_message(message_id, from_id, last_name, txt, "Hello, world!", current_time)
@@ -340,6 +343,7 @@ def process_message_content(chat_id, message_id, from_id, last_name, txt, msg, c
         save_message_to_db_message(message_id, from_id, last_name, txt, "You have clicked B", current_time)
     elif txt == "read_new":
         r, str1 = tele_read_news(chat_id)
+        print(f"đây là r: {r}")
         save_message_to_db_message(message_id, from_id, last_name, txt, str1, current_time)
     else:
         write_json(msg, 'xxx.json')

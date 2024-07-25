@@ -1,4 +1,4 @@
-﻿certifi==2021.10.8
+certifi==2021.10.8
 charset-normalizer==2.0.12
 click==8.1.2
 colorama==0.4.4
@@ -12,3 +12,6 @@ requests==2.27.1
 urllib3==1.26.9
 Werkzeug==2.1.1
 zipp==3.8.0
+beautifulsoup4==4.11.1
+psycopg2-binary==2.9.8
+waitress==2.1.2
