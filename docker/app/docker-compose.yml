@@ -17,7 +17,7 @@ services:
       dockerfile: Dockerfile
     restart: always
     environment:
-      - DB_PORT = 5432
-      - DB_HOST = Telegram_2002
+      - DB_PORT=5432
+      - DB_HOST=Telegram_2002
     ports:
-      - 8080:8080
+      - '8080:8080'
