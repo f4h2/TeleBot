@@ -1,7 +1,7 @@
 {
-    "update_id": 209310695,
+    "update_id": 209310726,
     "message": {
-        "message_id": 479,
+        "message_id": 566,
         "from": {
             "id": 7460716153,
             "is_bot": false,
@@ -15,7 +15,7 @@
             "last_name": "Nguyễn Khánh",
             "type": "private"
         },
-        "date": 1721877361,
-        "text": "hero"
+        "date": 1721965471,
+        "text": "máy bay"
     }
 }

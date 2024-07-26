@@ -1,7 +1,7 @@
 import psycopg2
 import psycopg2.extras
 
-hostname = 'localhost'
+hostname = 'Telegram_2002db'
 database = 'Telegram_2002'
 username = 'postgres'
 pwd = '12345678'
