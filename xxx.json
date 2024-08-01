@@ -1,21 +1,21 @@
 {
-    "update_id": 209310726,
     "message": {
-        "message_id": 566,
-        "from": {
-            "id": 7460716153,
-            "is_bot": false,
-            "first_name": "Trường Lộc",
-            "last_name": "Nguyễn Khánh",
-            "language_code": "en"
-        },
         "chat": {
-            "id": 7460716153,
             "first_name": "Trường Lộc",
+            "id": 7460716153,
             "last_name": "Nguyễn Khánh",
             "type": "private"
         },
-        "date": 1721965471,
-        "text": "máy bay"
-    }
+        "date": 1722476106,
+        "from": {
+            "first_name": "Trường Lộc",
+            "id": 7460716153,
+            "is_bot": false,
+            "language_code": "en",
+            "last_name": "Nguyễn Khánh"
+        },
+        "message_id": 672,
+        "text": "máy bay phản lực"
+    },
+    "update_id": 209310765
 }

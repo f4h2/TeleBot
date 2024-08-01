@@ -14,7 +14,6 @@ def tel_parse_get_message(message):
         g_file_id = message['message']['photo'][0]['file_id']
         print("g_chat_id-->", g_chat_id)
         print("g_image_id-->", g_file_id)
-
         return g_file_id
     except:
         try:
