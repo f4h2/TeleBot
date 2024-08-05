@@ -1,354 +1,270 @@
 import requests
 import json
 from bs4 import BeautifulSoup
-from utils import write_json
-from db_utils import save_message_to_db_message
+from utils import JSONHandler
+from db_utils import DatabaseManager
 
-TOKEN = "7334701342:AAHnfB9e1AUAEq2bIVmT1WmFVW9s_4325Pg"
 
-def tel_parse_get_message(message):
-    print("message-->", message)
 
-    try:
-        g_chat_id = message['message']['chat']['id']
-        g_file_id = message['message']['photo'][0]['file_id']
-        print("g_chat_id-->", g_chat_id)
-        print("g_image_id-->", g_file_id)
-        return g_file_id
-    except:
+class TelegramBot:
+    def __init__(self, token):
+        self.token = token
+
+    def _send_request(self, method, payload):
+        url = f'https://api.telegram.org/bot{self.token}/{method}'
+        response = requests.post(url, json=payload)
+        return response
+
+    def tel_parse_get_message(self, message):
+        print("message-->", message)
         try:
             g_chat_id = message['message']['chat']['id']
-            g_file_id = message['message']['video']['file_id']
-            print("g_chat_id-->", g_chat_id)
-            print("g_video_id-->", g_file_id)
-
-            return g_file_id
-        except:
-            try:
-                g_chat_id = message['message']['chat']['id']
-                g_file_id = message['message']['audio']['file_id']
+            file_id = message['message'].get('photo', [{}])[0].get('file_id') or \
+                      message['message'].get('video', {}).get('file_id') or \
+                      message['message'].get('audio', {}).get('file_id') or \
+                      message['message'].get('document', {}).get('file_id')
+            if file_id:
                 print("g_chat_id-->", g_chat_id)
-                print("g_audio_id-->", g_file_id)
+                print("g_file_id-->", file_id)
+                return file_id
+        except:
+            print("NO file found-->>")
+        return None
 
-                return g_file_id
-            except:
-                try:  # if the file is a document
-                    g_chat_id = message['message']['chat']['id']
-                    g_file_id = message['message']['document']['file_id']
-                    print("g_chat_id-->", g_chat_id)
-                    print("g_file_id-->", g_file_id)
+    def tel_parse_message(self, message):
+        print("message-->", message)
+        try:
+            chat_id = message['message']['chat']['id']
+            message_id = message['message']['message_id']
+            from_id = message['message']['from']['id']
+            first_name = message['message']['from'].get('first_name', 'Unknown')
+            last_name = message['message']['from'].get('last_name', '')
+            username = message['message']['from'].get('username', 'Unknown')
+            text = message['message'].get('text', '')
+            photo = message['message'].get('photo', [])
+            video = message['message'].get('video', {})
+            audio = message['message'].get('audio', {})
+            document = message['message'].get('document', {})
+            caption = message['message'].get('caption', '')
 
-                    return g_file_id
-                except:
-                    print("NO file found found-->>")
+            return chat_id, message_id, text, from_id, first_name, last_name, username, text, photo, video, audio, document, caption
 
+        except KeyError as e:
+            print(f"KeyError: {e} - Missing key in message")
+        except Exception as e:
+            print(f"Error: {e}")
 
-def tel_parse_message(message):
-    print("message-->", message)
+        try:
+            callback_id = message['callback_query']['id']
+            callback_from_id = message['callback_query']['from']['id']
+            callback_first_name = message['callback_query']['from'].get('first_name', 'Unknown')
+            callback_last_name = message['callback_query']['from'].get('last_name', '')
+            callback_username = message['callback_query']['from'].get('username', 'Unknown')
+            callback_data = message['callback_query']['data']
 
-    try:
-        chat_id = message['message']['chat']['id']
-        message_id = message['message']['message_id']
-        from_id = message['message']['from']['id']
-        first_name = message['message']['from'].get('first_name', 'Unknown')
-        last_name = message['message']['from'].get('last_name', '')
-        username = message['message']['from'].get('username', 'Unknown')
-        text = message['message'].get('text', '')
-        photo = message['message'].get('photo', [])
-        video = message['message'].get('video', {})
-        audio = message['message'].get('audio', {})
-        document = message['message'].get('document', {})
-        caption = message['message'].get('caption', '')
+            print(f"callback_id: {callback_id}")
+            print(f"callback_from_id: {callback_from_id}")
+            print(f"callback_first_name: {callback_first_name}")
+            print(f"callback_last_name: {callback_last_name}")
+            print(f"callback_username: {callback_username}")
+            print(f"callback_data: {callback_data}")
 
-        return chat_id,message_id, text, from_id, first_name, last_name, username, text, photo, video, audio, document, caption
+            return callback_from_id, callback_data
 
-    except KeyError as e:
-        print(f"KeyError: {e} - Missing key in message")
-    except Exception as e:
-        print(f"Error: {e}")
+        except KeyError as e:
+            print(f"KeyError: {e} - Missing key in callback_query")
+        except Exception as e:
+            print(f"Error: {e}")
 
-    try:
-        callback_id = message['callback_query']['id']
-        callback_from_id = message['callback_query']['from']['id']
-        callback_first_name = message['callback_query']['from'].get('first_name', 'Unknown')
-        callback_last_name = message['callback_query']['from'].get('last_name', '')
-        callback_username = message['callback_query']['from'].get('username', 'Unknown')
-        callback_data = message['callback_query']['data']
+        return None, None
 
-        print(f"callback_id: {callback_id}")
-        print(f"callback_from_id: {callback_from_id}")
-        print(f"callback_first_name: {callback_first_name}")
-        print(f"callback_last_name: {callback_last_name}")
-        print(f"callback_username: {callback_username}")
-        print(f"callback_data: {callback_data}")
+    def tel_send_message(self, chat_id, text):
+        payload = {'chat_id': chat_id, 'text': text}
+        return self._send_request('sendMessage', payload)
 
-        # Trả về thông tin cần thiết
-        return callback_from_id, callback_data
+    def tel_send_image(self, chat_id):
+        payload = {'chat_id': chat_id, 'photo': "https://admin.vov.gov.vn/UploadFolder/KhoTin/Images/UploadFolder/VOVVN/Images/sites/default/files/styles/large/public/2024-02/vu%20tru.jpg"}
+        response = self._send_request('sendPhoto', payload)
+        return response, payload['photo']
 
-    except KeyError as e:
-        print(f"KeyError: {e} - Missing key in callback_query")
-    except Exception as e:
-        print(f"Error: {e}")
-
-    return None, None
-
-
-def tel_send_message(chat_id, text):
-    url = f'https://api.telegram.org/bot{TOKEN}/sendMessage'
-    payload = {
-        'chat_id': chat_id,
-        'text': text
-    }
-    r = requests.post(url, json=payload)
-    return r
-
-
-def tel_send_image(chat_id):
-    url = f'https://api.telegram.org/bot{TOKEN}/sendPhoto'
-    t = "https://admin.vov.gov.vn/UploadFolder/KhoTin/Images/UploadFolder/VOVVN/Images/sites/default/files/styles/large/public/2024-02/vu%20tru.jpg"
-    payload = {
-        'chat_id': chat_id,
-        'photo': t
-    }
-    r = requests.post(url, json=payload)
-    return r,t
-
-
-def tel_send_poll(chat_id):
-    url = f'https://api.telegram.org/bot{TOKEN}/sendPoll'
-    payload = {
-        'chat_id': chat_id,
-        "question": "In which direction does the sun rise?",
-        "options": json.dumps(["North", "South", "East", "West"]),
-        "is_anonymous": False,
-        "type": "quiz",
-        "correct_option_id": 2
-    }
-    r = requests.post(url, json=payload)
-    return r
-
-
-def tel_send_button(chat_id):
-    url = f'https://api.telegram.org/bot{TOKEN}/sendMessage'
-
-    payload = {
-        'chat_id': chat_id,
-        'text': "What is this?",
-        'reply_markup': {
-            'keyboard': [[
-                {
-                    'text': 'supa'
-                },
-                {
-                    'text': 'mario'
-                }
-            ]]
+    def tel_send_poll(self, chat_id):
+        payload = {
+            'chat_id': chat_id,
+            "question": "In which direction does the sun rise?",
+            "options": json.dumps(["North", "South", "East", "West"]),
+            "is_anonymous": False,
+            "type": "quiz",
+            "correct_option_id": 2
         }
-    }
-    r = requests.post(url, json=payload)
-    return r
+        return self._send_request('sendPoll', payload)
 
-
-def tel_send_inlinebutton(chat_id):
-    url = f'https://api.telegram.org/bot{TOKEN}/sendMessage'
-
-    payload = {
-        'chat_id': chat_id,
-        'text': "What is this?",
-        'reply_markup': {
-            "inline_keyboard": [[
-                {
-                    "text": "A",
-                    "callback_data": "ic_A"
-                },
-                {
-                    "text": "B",
-                    "callback_data": "ic_B"
-                }]
-            ]
+    def tel_send_button(self, chat_id):
+        payload = {
+            'chat_id': chat_id,
+            'text': "What is this?",
+            'reply_markup': {
+                'keyboard': [[{'text': 'supa'}, {'text': 'mario'}]]
+            }
         }
-    }
-    r = requests.post(url, json=payload)
-    return r
+        return self._send_request('sendMessage', payload)
 
+    def tel_send_inlinebutton(self, chat_id):
+        payload = {
+            'chat_id': chat_id,
+            'text': "What is this?",
+            'reply_markup': {
+                "inline_keyboard": [[
+                    {"text": "A", "callback_data": "ic_A"},
+                    {"text": "B", "callback_data": "ic_B"}
+                ]]
+            }
+        }
+        return self._send_request('sendMessage', payload)
 
-def tel_send_inlineurl(chat_id):
-    url = f'https://api.telegram.org/bot{TOKEN}/sendMessage'
-
-    payload = {
-        'chat_id': chat_id,
-        'text': "Which link would you like to visit?",
-        'reply_markup': {
-            "inline_keyboard": [
-                [
-                    {"text": "google", "url": "http://www.google.com/"},
-                    {"text": "youtube", "url": "http://www.youtube.com/"}
+    def tel_send_inlineurl(self, chat_id):
+        payload = {
+            'chat_id': chat_id,
+            'text': "Which link would you like to visit?",
+            'reply_markup': {
+                "inline_keyboard": [
+                    [{"text": "google", "url": "http://www.google.com/"},
+                     {"text": "youtube", "url": "http://www.youtube.com/"}]
                 ]
-            ]
+            }
         }
-    }
-    r = requests.post(url, json=payload)
-    return r
+        return self._send_request('sendMessage', payload)
 
+    def tel_send_audio(self, chat_id):
+        payload = {
+            'chat_id': chat_id,
+            "audio": "http://www.largesound.com/ashborytour/sound/brobob.mp3",
+        }
+        response = self._send_request('sendAudio', payload)
+        return response, payload["audio"]
 
-def tel_send_audio(chat_id):
-    url = f'https://api.telegram.org/bot{TOKEN}/sendAudio'
-    t = "http://www.largesound.com/ashborytour/sound/brobob.mp3"
-    payload = {
-        'chat_id': chat_id,
-        "audio": t,
-    }
-    r = requests.post(url, json=payload)
-    return r,t
+    def tel_send_document(self, chat_id):
+        payload = {
+            'chat_id': chat_id,
+            "document": "http://www.africau.edu/images/default/sample.pdf"
+        }
+        response = self._send_request('sendDocument', payload)
+        return response, payload["document"]
 
+    def tel_send_video(self, chat_id):
+        payload = {
+            'chat_id': chat_id,
+            "video": "https://www.appsloveworld.com/wp-content/uploads/2018/10/640.mp4"
+        }
+        response = self._send_request('sendVideo', payload)
+        return response, payload["video"]
 
-def tel_send_document(chat_id):
-    url = f'https://api.telegram.org/bot{TOKEN}/sendDocument'
-    t = "http://www.africau.edu/images/default/sample.pdf"
-    payload = {
-        'chat_id': chat_id,
-        "document": t
-    }
-    r = requests.post(url, json=payload)
-    return r,t
+    def tel_upload_file(self, file_id):
+        url = f'https://api.telegram.org/bot{self.token}/getFile?file_id={file_id}'
+        response = requests.post(url)
+        json_resp = response.json()
+        file_path = json_resp['result']['file_path']
+        file_url = f'https://api.telegram.org/file/bot{self.token}/{file_path}'
+        file_content = requests.get(file_url).content
+        with open(file_path, "wb") as f:
+            f.write(file_content)
 
+    def get_news(self):
+        list_news = []
+        response = requests.get("https://vnexpress.net/")
+        soup = BeautifulSoup(response.text, 'html.parser')
+        news_divs = soup.find_all("h3", {"class": "title-news"})
 
-def tel_send_video(chat_id):
-    url = f'https://api.telegram.org/bot{TOKEN}/sendVideo'
-    t = "https://www.appsloveworld.com/wp-content/uploads/2018/10/640.mp4"
-    payload = {
-        'chat_id': chat_id,
-        "video": t
-    }
-    r = requests.post(url, json=payload)
-    return r,t
+        for news in news_divs:
+            news_dict = {}
+            news_dict["link"] = news.a.get("href")
+            news_dict["title"] = news.a.get("title")
+            list_news.append(news_dict)
+        return list_news
 
-def tel_upload_file(file_id):
-    url = f'https://api.telegram.org/bot{TOKEN}/getFile?file_id={file_id}'
-    a = requests.post(url)
-    json_resp = json.loads(a.content)
-    print("json_resp-->", json_resp)
-    file_pathh = json_resp['result']['file_path']
-    print("file_pathh-->", file_pathh)
-    url_1 = f'https://api.telegram.org/file/bot{TOKEN}/{file_pathh}'
-    b = requests.get(url_1)
-    file_content = b.content
-    with open(file_pathh, "wb") as f:
-        f.write(file_content)
+    def tele_read_news(self, chat_id):
+        data = self.get_news()
+        news_str = "\n".join(item["title"] for item in data)
+        payload = {'chat_id': chat_id, 'text': news_str}
+        response = self._send_request('sendMessage', payload)
+        return response, news_str
 
+    def searchGoogle(self, textSearch):
+        API_KEY = "AIzaSyAxQ78Jk6iqUD2bCKsleEPWBjy8VXKBaQA"
+        SEARCH_ENGINE_ID = "80854a8a4f95a4634"
+        search_query = textSearch
+        url = 'https://www.googleapis.com/customsearch/v1'
+        params = {
+            'q': search_query,
+            'key': API_KEY,
+            'cx': SEARCH_ENGINE_ID,
+            'searchType': 'image'
+        }
+        response = requests.get(url, params=params)
+        results = response.json().get('items', [])
+        image_urls = [item['link'] for item in results if 'link' in item]
+        return image_urls
 
-################ get new
+    def teleSearchGoogle(self, chat_id, textSearch):
+        image_urls = self.searchGoogle(textSearch)
+        if not image_urls:
+            return self.tel_send_message(chat_id, 'No images found for your search.')
+        first_image_url = image_urls[0]
+        payload = {'chat_id': chat_id, 'photo': first_image_url}
+        response = self._send_request('sendPhoto', payload)
+        return response, first_image_url
 
-def get_news():
-    list_news = []
-    r = requests.get("https://vnexpress.net/")
-    soup = BeautifulSoup(r.text, 'html.parser')
-    mydivs = soup.find_all("h3", {"class": "title-news"})
-
-    for new in mydivs:
-        newdict = {}
-        newdict["link"] = new.a.get("href")
-        newdict["title"] = new.a.get("title")
-        list_news.append(newdict)
-    return list_news
-
-
-def tele_read_news(chat_id):
-    data = get_news()
-    str1 = ""
-    for item in data:
-        str1 += item["title"] + "\n"
-
-    url = f'https://api.telegram.org/bot{TOKEN}/sendMessage'
-
-    payload = {
-        'chat_id': chat_id,
-        'text': str1
-    }
-    r = requests.post(url, json=payload)
-    return r,str1
-############### searchGoogle
-def searchGoogle(textSearch):
-    API_KEY = "AIzaSyAxQ78Jk6iqUD2bCKsleEPWBjy8VXKBaQA"          # https://console.cloud.google.com/apis/credentials?project=testsearch-429915
-    SEARCH_ENGINE_ID = "80854a8a4f95a4634"                     # https://programmablesearchengine.google.com/controlpanel/overview?cx=705ae1e64eda449fc
-    search_query = textSearch
-    url = 'https://www.googleapis.com/customsearch/v1'
-    params = {
-        'q': search_query,
-        'key': API_KEY,
-        'cx': SEARCH_ENGINE_ID,
-        'searchType': 'image'
-    }
-    response = requests.get(url, params=params)
-    results = response.json().get('items', [])
-    image_urls = [item['link'] for item in results if 'link' in item]
-    return image_urls
-
-
-def teleSearchGoogle(chat_id, textSearch):
-    image_urls = searchGoogle(textSearch)
-    if not image_urls:
-        return tel_send_message(chat_id, 'No images found for your search.')
-
-    first_image_url = image_urls[0]
-    url = f'https://api.telegram.org/bot{TOKEN}/sendPhoto'
-    payload = {
-        'chat_id': chat_id,
-        'photo': first_image_url
-    }
-    r = requests.post(url, json=payload)
-    return r, first_image_url
-###############################
-
-processed_message_ids = set()
-def process_message_content(chat_id, message_id, from_id, last_name, txt, msg, current_time):
-    if message_id in processed_message_ids:
-        return
-    processed_message_ids.add(message_id)
-    if txt == "hi":
-        tel_send_message(chat_id, "Hello, world!")
-        save_message_to_db_message(message_id, from_id, last_name, txt, "Hello, world!", current_time)
-    elif txt == "image":
-        print("Sending image...")
-        r, t = tel_send_image(chat_id)
-        print(f"Image sent: {t}")
-        save_message_to_db_message(message_id, from_id, last_name, txt, t, current_time)
-    elif txt == "poll":
-        tel_send_poll(chat_id)
-        save_message_to_db_message(message_id, from_id, last_name, txt, "poll", current_time)
-    elif txt == "button":
-        tel_send_button(chat_id)
-        save_message_to_db_message(message_id, from_id, last_name, txt, "button", current_time)
-    elif txt == "audio":
-        r, t = tel_send_audio(chat_id)
-        save_message_to_db_message(message_id, from_id, last_name, txt, t, current_time)
-    elif txt == "file":
-        r, t = tel_send_document(chat_id)
-        save_message_to_db_message(message_id, from_id, last_name, txt, t, current_time)
-    elif txt == "video":
-        r, t = tel_send_video(chat_id)
-        save_message_to_db_message(message_id, from_id, last_name, txt, t, current_time)
-    elif txt == "inline":
-        tel_send_inlinebutton(chat_id)
-        save_message_to_db_message(message_id, from_id, last_name, txt, "inline", current_time)
-    elif txt == "inlineurl":
-        tel_send_inlineurl(chat_id)
-        save_message_to_db_message(message_id, from_id, last_name, txt, "inlineurl", current_time)
-    elif txt == "ic_A":
-        tel_send_message(chat_id, "You have clicked A")
-        save_message_to_db_message(message_id, from_id, last_name, txt, "You have clicked A", current_time)
-    elif txt == "ic_B":
-        tel_send_message(chat_id, "You have clicked B")
-        save_message_to_db_message(message_id, from_id, last_name, txt, "You have clicked B", current_time)
-    elif txt == "read_new":
-        r, str1 = tele_read_news(chat_id)
-        print(f"đây là r: {r}")
-        save_message_to_db_message(message_id, from_id, last_name, txt, str1, current_time)
-    else:
-        write_json(msg, 'xxx.json')
-        response, image_url = teleSearchGoogle(chat_id, txt)
-        if response.status_code == 200:
-            tel_send_message(chat_id, 'from webhook')
+    ###############################
+    def process_message_content(self, chat_id, message_id, from_id, last_name, txt, msg, current_time):
+        database = DatabaseManager()
+        # jsonhandler = JSONHandler()
+        processed_message_ids = set()
+        if message_id in processed_message_ids:
+            return
+        processed_message_ids.add(message_id)
+        if txt == "hi":
+            self.tel_send_message(chat_id, "Hello, world!")
+            database.save_message_to_db_message(message_id, from_id, last_name, txt, "Hello, world!", current_time)
+        elif txt == "image":
+            print("Sending image...")
+            r, t = self.tel_send_image(chat_id)
+            print(f"Image sent: {t}")
+            database.save_message_to_db_message(message_id, from_id, last_name, txt, t, current_time)
+        elif txt == "poll":
+            self.tel_send_poll(chat_id)
+            database.save_message_to_db_message(message_id, from_id, last_name, txt, "poll", current_time)
+        elif txt == "button":
+            self.tel_send_button(chat_id)
+            database.save_message_to_db_message(message_id, from_id, last_name, txt, "button", current_time)
+        elif txt == "audio":
+            r, t = self.tel_send_audio(chat_id)
+            database.save_message_to_db_message(message_id, from_id, last_name, txt, t, current_time)
+        elif txt == "file":
+            r, t = self.tel_send_document(chat_id)
+            database.save_message_to_db_message(message_id, from_id, last_name, txt, t, current_time)
+        elif txt == "video":
+            r, t = self.tel_send_video(chat_id)
+            database.save_message_to_db_message(message_id, from_id, last_name, txt, t, current_time)
+        elif txt == "inline":
+            self.tel_send_inlinebutton(chat_id)
+            database.save_message_to_db_message(message_id, from_id, last_name, txt, "inline", current_time)
+        elif txt == "inlineurl":
+            self.tel_send_inlineurl(chat_id)
+            database.save_message_to_db_message(message_id, from_id, last_name, txt, "inlineurl", current_time)
+        elif txt == "ic_A":
+            self.tel_send_message(chat_id, "You have clicked A")
+            database.save_message_to_db_message(message_id, from_id, last_name, txt, "You have clicked A", current_time)
+        elif txt == "ic_B":
+            self.tel_send_message(chat_id, "You have clicked B")
+            database.save_message_to_db_message(message_id, from_id, last_name, txt, "You have clicked B", current_time)
+        elif txt == "read_new":
+            r, str1 = self.tele_read_news(chat_id)
+            print(f"đây là r: {r}")
+            database.save_message_to_db_message(message_id, from_id, last_name, txt, str1, current_time)
         else:
-            image_url = "Failed to get URL"
-        save_message_to_db_message(message_id, from_id, last_name, txt, image_url, current_time)
+            # jsonhandler.write_json(msg, 'xxx.json')
+            response, image_url = self.teleSearchGoogle(chat_id, txt)
+            if response.status_code == 200:
+                self.tel_send_message(chat_id, 'from webhook')
+            else:
+                image_url = "Failed to get URL"
+            database.save_message_to_db_message(message_id, from_id, last_name, txt, image_url, current_time)

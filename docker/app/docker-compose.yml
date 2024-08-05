@@ -35,3 +35,25 @@ services:
       - PGADMIN_DEFAULT_PASSWORD=12345678
     ports:
       - '5050:80'
+
+
+  redis-node-1:
+    build:
+      context: ../..
+      dockerfile: docker/app/Dockerfile-node1
+    ports:
+      - '6123:6379'
+
+  redis-node-2:
+    build:
+      context: ../..
+      dockerfile: docker/app/Dockerfile-node2
+    ports:
+      - '6124:6379'
+
+  redis-node-3:
+    build:
+      context: ../..
+      dockerfile: docker/app/Dockerfile-node3
+    ports:
+      - '6125:6379'

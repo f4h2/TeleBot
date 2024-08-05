@@ -1,118 +1,123 @@
 import threading
 import time
-
-import redis
-from flask import Flask, request, Response, json
+import json
+from flask import Flask, request, Response
 from datetime import datetime
-from telegram_utils import tel_parse_message, tel_send_message, tel_parse_get_message, tel_upload_file, \
-    process_message_content
-from db_utils import create_table_user, create_table_message, save_message_to_db_message, save_user_to_db
+from telegram_utils import TelegramBot
+from db_utils import DatabaseManager
 from queue import Queue
 from rediscluster import RedisCluster
-import redis
 
 
-app = Flask(__name__)
-workQueue = Queue(maxsize=500)
 
-thread_exit_Flag = False
-
-class SampleThread(threading.Thread):
-    def __init__(self, threadID, q):
-        threading.Thread.__init__(self)
+token = "7334701342:AAHnfB9e1AUAEq2bIVmT1WmFVW9s_4325Pg"
+class Worker(threading.Thread):
+    def __init__(self, threadID,redis_cluster):
+        super().__init__()
         self.threadID = threadID
-        self.q = q
+        self.redis_cluster = redis_cluster
+        self.thread_exit_flag = False
 
     def run(self):
-        worker(self.q)
+        db_manager = DatabaseManager()
+        tele=TelegramBot(token)
+        while not self.thread_exit_flag:
+            # Lấy dữ liệu từ Redis Queue
+            message_data = self.redis_cluster.lpop('workQueue')
+            if message_data:
+                message_data = json.loads(message_data)
+                tele.process_message_content(
+                    message_data["chat_id"],
+                    message_data["message_id"],
+                    message_data["from_id"],
+                    message_data["last_name"],
+                    message_data["txt"],
+                    message_data["msg"],
+                    message_data["current_time"]
+                )
+                db_manager.save_user_to_db(message_data["first_name"], message_data["last_name"])
+            else:
+                time.sleep(1)
 
-startup_nodes = [
-    {"host": "localhost", "port": "6123"},
-    {"host": "localhost", "port": "6124"},
-    {"host": "localhost", "port": "6125"}
-]
-redis_cluster = RedisCluster(startup_nodes=startup_nodes, decode_responses=True)
+    def stop(self):
+        self.thread_exit_flag = True
 
-def worker():
-    while not thread_exit_Flag:
-        # Lấy dữ liệu từ Redis Queue
-        message_data = redis_cluster.lpop('workQueue')
-        if message_data:
-            message_data = json.loads(message_data)
-            process_message_content(
-                message_data["chat_id"],
-                message_data["message_id"],
-                message_data["from_id"],
-                message_data["last_name"],
-                message_data["txt"],
-                message_data["msg"],
-                message_data["current_time"]
-            )
-            save_user_to_db(message_data["first_name"], message_data["last_name"])
-        else:
-            time.sleep(1)
+class App:
+    def __init__(self):
+        self.app = Flask(__name__)
+        self.redis_cluster = RedisCluster(startup_nodes=[
+            {"host": "localhost", "port": "6123"},
+            {"host": "localhost", "port": "6124"},
+            {"host": "localhost", "port": "6125"}
+        ], decode_responses=True)
+        self.workers = []
+        self.number_of_threads = 50
+        self.setup_routes()
 
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    if request.method == 'POST':
-        msg = request.get_json()
-        current_time = datetime.now()
+    def setup_routes(self):
+        @self.app.route('/', methods=['GET', 'POST'])
+        def index():
+            telebot = TelegramBot(token)
+            if request.method == 'POST':
+                msg = request.get_json()
+                current_time = datetime.now().isoformat()
 
-        chat_id, message_id, text, from_id, first_name, last_name, username, txt, photo, video, audio, document, caption = tel_parse_message(
-            msg)
+                chat_id, message_id, text, from_id, first_name, last_name, username, txt, photo, video, audio, document, caption = telebot.tel_parse_message(
+                    msg)
 
-        message_data = {
-            "chat_id": chat_id,
-            "message_id": message_id,
-            "text": text,
-            "from_id": from_id,
-            "first_name": first_name,
-            "last_name": last_name,
-            "username": username,
-            "txt": txt,
-            "photo": photo,
-            "video": video,
-            "audio": audio,
-            "document": document,
-            "caption": caption,
-            "msg": msg,
-            "current_time": current_time
-        }
+                message_data = {
+                    "chat_id": chat_id,
+                    "message_id": message_id,
+                    "text": text,
+                    "from_id": from_id,
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "username": username,
+                    "txt": txt,
+                    "photo": photo,
+                    "video": video,
+                    "audio": audio,
+                    "document": document,
+                    "caption": caption,
+                    "msg": msg,
+                    "current_time": current_time
+                }
 
-        # Đưa dữ liệu vào Redis Queue
-        redis_cluster.rpush('workQueue', json.dumps(message_data))
+                # Đưa dữ liệu vào Redis Queue
+                self.redis_cluster.rpush('workQueue', json.dumps(message_data))
 
-        try:
-            file_id = tel_parse_get_message(msg)
-            tel_upload_file(file_id)
-        except:
-            print("No file from index-->")
+                try:
+                    file_id = telebot.tel_parse_get_message(msg)
+                    telebot.tel_upload_file(file_id)
+                except:
+                    print("No file from index-->")
 
-        return Response('ok', status=200)
-    else:
-        return "<h1>Welcome!</h1>"
+                return Response('ok', status=200)
+            else:
+                return "<h1>Welcome!</h1>"
 
-threads = []
-threadID = 1
-number_thread = 50
+    def start(self):
+        db_manager = DatabaseManager()
+        db_manager.create_table_user()
+        db_manager.create_table_message()
+
+        for i in range(self.number_of_threads):
+            worker = Worker(i + 1, self.redis_cluster)
+            worker.start()
+            self.workers.append(worker)
+
+        from waitress import serve
+        serve(self.app, host="0.0.0.0", port=8080, threads=50)
+
+        while not self.redis_cluster.llen('workQueue'):
+            pass
+        for worker in self.workers:
+            worker.stop()
+        for worker in self.workers:
+            worker.join()
+
+        print("Exit Main Thread")
 
 if __name__ == '__main__':
-    create_table_user()
-    create_table_message()
-
-    for _ in range(number_thread):
-        thread = threading.Thread(target=worker)
-        thread.start()
-        threads.append(thread)
-
-    from waitress import serve
-    serve(app, host="0.0.0.0", port=8080, threads=50)
-
-    while not redis_cluster.llen('workQueue'):
-        pass
-
-    thread_exit_Flag = True
-
-    for t in threads:
-        t.join()
-    print("Exit Main Thread")
+    app = App()
+    app.start()
